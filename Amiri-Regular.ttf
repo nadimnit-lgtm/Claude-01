@@ -1,0 +1,558 @@
+/* =========================================================================
+   Azkar TV Display — Android TV / phone / tablet WebView
+   Master tabs: Dua + Azkar + Kalima · gesture-first navigation · compact salah ribbon
+   ========================================================================= */
+'use strict';
+
+const MODE = (new URLSearchParams(location.search).get('mode') || 'app');
+const SCREENSAVER = MODE === 'screensaver';
+if (SCREENSAVER) document.body.classList.add('screensaver');
+
+const TABS = ['azkar', 'dua', 'kalima', 'durood', 'istighfar'];
+const TYPES = TABS;
+const SVG = {
+  azkar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9c4-3.2 12-3.2 16 0"/><circle cx="6" cy="13" r="2.1"/><circle cx="12" cy="13.6" r="2.1"/><circle cx="18" cy="13" r="2.1"/></svg>',
+  dua: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10c0 6 3.6 9 8 9s8-3 8-9"/><path d="M4 10c0-1.8 1.3-3 2.8-3s2.8 1.2 2.8 3"/><path d="M9.6 10c0-1.8 1.1-3 2.4-3s2.4 1.2 2.4 3"/><path d="M14.4 10c0-1.8 1.3-3 2.8-3s2.8 1.2 2.8 3"/></svg>',
+  kalima: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="21" x2="12" y2="8"/><circle cx="12" cy="4" r="2"/></svg>',
+  durood: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7.5" r="3"/><circle cx="12" cy="16.5" r="3"/><circle cx="7.5" cy="12" r="3"/><circle cx="16.5" cy="12" r="3"/><circle cx="12" cy="12" r="1.6"/></svg>',
+  istighfar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 5 20 10 15 10"/><path d="M20 10A8 8 0 1 0 18 16"/></svg>',
+  search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
+  history: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 4 3 9 8 9"/><polyline points="12 7.5 12 12 15 14"/></svg>',
+  stats: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="20" x2="6" y2="12"/><line x1="12" y1="20" x2="12" y2="5"/><line x1="18" y1="20" x2="18" y2="14"/></svg>',
+  star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 3 14.6 8.6 20.8 9.3 16.2 13.5 17.5 19.6 12 16.4 6.5 19.6 7.8 13.5 3.2 9.3 9.4 8.6"/></svg>',
+  starFill: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><polygon points="12 3 14.6 8.6 20.8 9.3 16.2 13.5 17.5 19.6 12 16.4 6.5 19.6 7.8 13.5 3.2 9.3 9.4 8.6"/></svg>'
+};
+const TYPE_LABEL = { azkar: 'Azkar', dua: 'Dua', kalima: 'Kalima', durood: 'Durood', istighfar: 'Istighfar' };
+const TAB_LABEL = TYPE_LABEL;
+const itemTab = it => it && (it.tab || it.type);
+const MODE_LABEL = {
+  mixed: 'Mixed', dua: 'Dua', azkar: 'Azkar', kalima: 'Six Kalimas', durood: 'Durood', quranic_dua: 'Quranic Duas', daily_dua: 'Daily Duas',
+  morning: 'Morning Azkar', evening: 'Evening Azkar', after_salah: 'After Salah', sleep: 'Sleep',
+  protection: 'Protection', ruqyah: 'Ruqyah', istighfar: 'Istighfar', salawat: 'Darood / Salawat',
+  daily_azkar: 'Tasbih / Tahleel', witr_istikhara: 'Witr / Istikhara', favorites: 'Favorites', random: 'Random', friday: 'Friday', ramadan: 'Ramadan', hajj_umrah: 'Hajj / Umrah', anxiety: 'Anxiety & Distress', health: 'Health', rizq: 'Rizq', family: 'Family', travel: 'Travel', food: 'Food', mosque: 'Mosque', knowledge: 'Knowledge'
+};
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const clone = obj => JSON.parse(JSON.stringify(obj));
+const $ = id => document.getElementById(id);
+const card = () => $('card');
+const body = () => $('body');
+
+/* ---------------- persistent settings ---------------- */
+const SETTINGS_KEY = 'azkar_settings_v3';
+const FAVORITES_KEY = 'azkar_favorites_v2';
+const STATS_KEY = 'azkar_usage_stats_v1';
+const DEFAULTS = {
+  theme: 'light', timerSec: 60, ar: 1, tr: 1, en: 1,
+  rotationMode: 'mixed', autoRotate: true, showTranslit: true,
+  showSalah: false, showChips: false, tajweed: true,
+  cityMode: 'auto', displayMode: 'full', immersive: true
+};
+let S = loadSettings();
+let draftSettings = null;
+function loadSettings() {
+  try {
+    const cached = JSON.parse(localStorage.getItem(SETTINGS_KEY));
+    if (cached) return Object.assign({}, DEFAULTS, cached);
+    const legacy = JSON.parse(localStorage.getItem('azkar_settings_v2'));
+    if (legacy) return Object.assign({}, DEFAULTS, legacy, { rotationMode: legacy.rotateType ? 'mixed' : 'azkar' });
+  } catch (e) {}
+  return Object.assign({}, DEFAULTS);
+}
+function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(S)); } catch (e) {} }
+const TOGNAMES = {
+  autoRotate: 'Auto-rotate', showTranslit: 'Transliteration', showSalah: 'Salah ribbon',
+  showChips: 'Show Category Chips', tajweed: 'Tajweed colours', immersive: 'TV immersive mode'
+};
+function applySettings(persist) {
+  document.documentElement.setAttribute('data-theme', S.theme);
+  document.documentElement.style.setProperty('--ar-scale', S.ar);
+  document.documentElement.style.setProperty('--tr-scale', S.tr);
+  document.documentElement.style.setProperty('--en-scale', S.en);
+  document.body.classList.toggle('hide-tr', !S.showTranslit);
+  document.body.classList.toggle('hide-salah', !S.showSalah);
+  document.body.classList.toggle('show-chips', !!S.showChips);
+  document.body.classList.toggle('hide-tajweed', !S.tajweed);
+  document.body.classList.toggle('display-ar', S.displayMode === 'arabic');
+  document.body.classList.toggle('display-ar-en', S.displayMode === 'arabic_translation');
+  document.body.classList.toggle('display-ar-tr', S.displayMode === 'arabic_transliteration');
+  document.body.classList.toggle('immersive-ready', !!S.immersive);
+  if (persist) saveSettings();
+  if (DATA) { rebuildPlaylist(currentItemId()); renderTabs(); renderChips(); renderItem(); }
+  startRotate();
+  if (settingsOpen) syncSettingsUI();
+}
+
+/* ---------------- location detection ---------------- */
+const CITY_PRESETS = {
+  auto: { label:'Auto', lat:null, lng:null, tz:null, city:'Auto', country:'' },
+  riyadh: { label:'Riyadh', lat:24.7136, lng:46.6753, tz:3, city:'Riyadh', country:'Saudi Arabia' },
+  jeddah: { label:'Jeddah', lat:21.4858, lng:39.1925, tz:3, city:'Jeddah', country:'Saudi Arabia' },
+  makkah: { label:'Makkah', lat:21.3891, lng:39.8579, tz:3, city:'Makkah', country:'Saudi Arabia' },
+  madinah: { label:'Madinah', lat:24.5247, lng:39.5692, tz:3, city:'Madinah', country:'Saudi Arabia' },
+  dammam: { label:'Dammam', lat:26.4207, lng:50.0888, tz:3, city:'Dammam', country:'Saudi Arabia' }
+};
+const DEFAULT_GEO = CITY_PRESETS.riyadh;
+let GEO = loadGeo();
+function loadGeo() { try { const c = JSON.parse(localStorage.getItem('azkar_geo')); if (c && c.lat) return c; } catch (e) {} return Object.assign({}, DEFAULT_GEO); }
+function saveGeo(g) { try { localStorage.setItem('azkar_geo', JSON.stringify(g)); } catch (e) {} }
+function manualGeo() { const key = S.cityMode || 'auto'; return key !== 'auto' && CITY_PRESETS[key] ? Object.assign({}, CITY_PRESETS[key]) : null; }
+function netText(on) { const manual = manualGeo(); if (manual) return `Manual • ${manual.city}`; return on ? (GEO.city ? `Online • ${GEO.city}` : 'Online') : 'Offline • Last saved'; }
+function setNet(on) { const dot = $('net-dot'), label = $('net-label'); if (!dot || !label) return; dot.className = 'dot ' + (on || manualGeo() ? 'online' : 'offline'); label.textContent = netText(on); }
+function withTimeout(p, ms) { return Promise.race([p, new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))]); }
+function parseUtc(s) { const m = /([+-])(\d{2})(\d{2})/.exec(s || ''); return m ? (m[1] === '-' ? -1 : 1) * (+m[2] + (+m[3]) / 60) : null; }
+async function detectLocation() {
+  const manual = manualGeo();
+  if (manual) return manual;
+  try { const r = await withTimeout(fetch('https://ipapi.co/json/'), 6000); const j = await r.json(); if (j && j.latitude) return { lat:+j.latitude, lng:+j.longitude, tz:parseUtc(j.utc_offset), city:j.city || '', country:j.country_name || '' }; } catch (e) {}
+  try { const r = await withTimeout(fetch('http://ip-api.com/json/'), 6000); const j = await r.json(); if (j && j.lat) return { lat:+j.lat, lng:+j.lon, tz:j.offset != null ? j.offset / 3600 : null, city:j.city || '', country:j.country || '' }; } catch (e) {}
+  return null;
+}
+
+/* ---------------- prayer-time math, Umm al-Qura style ---------------- */
+const FAJR_ANGLE = 18.5, ISHA_INTERVAL = 90, ASR_FACTOR = 1;
+const PT = (function () {
+  const D2R = Math.PI / 180, R2D = 180 / Math.PI;
+  const dsin = d => Math.sin(d * D2R), dcos = d => Math.cos(d * D2R), dtan = d => Math.tan(d * D2R);
+  const darcsin = x => R2D * Math.asin(x), darccos = x => R2D * Math.acos(x), darctan2 = (y, x) => R2D * Math.atan2(y, x), darccot = x => R2D * Math.atan(1 / x);
+  const fix = (a, b) => { a -= b * Math.floor(a / b); return a < 0 ? a + b : a; };
+  const fixAngle = a => fix(a, 360), fixHour = a => fix(a, 24);
+  function julian(y, m, d) { if (m <= 2) { y -= 1; m += 12; } const A = Math.floor(y / 100), B = 2 - A + Math.floor(A / 4); return Math.floor(365.25 * (y + 4716)) + Math.floor(30.6001 * (m + 1)) + d + B - 1524.5; }
+  function sun(jd) { const D = jd - 2451545.0, g = fixAngle(357.529 + 0.98560028 * D), q = fixAngle(280.459 + 0.98564736 * D), L = fixAngle(q + 1.915 * dsin(g) + 0.020 * dsin(2 * g)), e = 23.439 - 0.00000036 * D, RA = darctan2(dcos(e) * dsin(L), dcos(L)) / 15; return { decl:darcsin(dsin(e) * dsin(L)), eqt:q / 15 - fixHour(RA) }; }
+  function times(date, lat, lng, tz) {
+    const jd = julian(date.getFullYear(), date.getMonth() + 1, date.getDate()) - lng / (15 * 24);
+    const midDay = t => fixHour(12 - sun(jd + t).eqt);
+    const angleTime = (a, t, ccw) => { const decl = sun(jd + t).decl; const v = (-dsin(a) - dsin(decl) * dsin(lat)) / (dcos(decl) * dcos(lat)); return midDay(t) + (ccw ? -1 : 1) * darccos(v) / 15; };
+    const asr = (f, t) => { const decl = sun(jd + t).decl; return angleTime(-darccot(f + dtan(Math.abs(lat - decl))), t, false); };
+    const adj = h => h + tz - lng / 15, mg = angleTime(0.833, 18 / 24, false);
+    return { Fajr:adj(angleTime(FAJR_ANGLE, 5 / 24, true)), Dhuhr:adj(midDay(12 / 24)), Asr:adj(asr(ASR_FACTOR, 13 / 24)), Maghrib:adj(mg), Isha:adj(mg + ISHA_INTERVAL / 60) };
+  }
+  return { times };
+})();
+const SALAH = [{key:'Fajr',ar:'الفجر'},{key:'Dhuhr',ar:'الظهر'},{key:'Asr',ar:'العصر'},{key:'Maghrib',ar:'المغرب'},{key:'Isha',ar:'العشاء'}];
+let prayerHours = {};
+function fix24(h) { h %= 24; return h < 0 ? h + 24 : h; }
+function fmt12(hf) { hf = fix24(hf); let h = Math.floor(hf), m = Math.round((hf - h) * 60); if (m === 60) { m = 0; h = (h + 1) % 24; } const ap = h >= 12 ? 'pm' : 'am'; let hh = h % 12; if (hh === 0) hh = 12; return hh + ':' + String(m).padStart(2, '0') + ' ' + ap; }
+function formatDateDDMMMYYYY(d) { const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return `${String(d.getDate()).padStart(2, '0')}-${months[d.getMonth()]}-${d.getFullYear()}`; }
+function computeTimes() { const tz = GEO.tz != null ? GEO.tz : -new Date().getTimezoneOffset() / 60; prayerHours = PT.times(new Date(), GEO.lat, GEO.lng, tz); setNet(navigator.onLine); }
+let alertedToday = {};
+function tickClock() {
+  const now = new Date(), h = now.getHours(), m = now.getMinutes(), s = now.getSeconds();
+  const ap = h >= 12 ? 'pm' : 'am'; let hh = h % 12; if (hh === 0) hh = 12;
+  $('hdr-date').textContent = formatDateDDMMMYYYY(now); $('hdr-time').textContent = `${hh}:${String(m).padStart(2, '0')} ${ap}`;
+  const nowH = h + m / 60 + s / 3600, order = SALAH.map(p => prayerHours[p.key]);
+  let nextIndex = order.findIndex(x => x > nowH), nextKey, nextH, currentIndex;
+  if (nextIndex === -1) { nextKey = 'Fajr'; nextH = order[0] + 24; currentIndex = 4; }
+  else { nextKey = SALAH[nextIndex].key; nextH = order[nextIndex]; currentIndex = nextIndex === 0 ? 4 : nextIndex - 1; }
+  $('current-name').textContent = SALAH[currentIndex].key; $('next-name').textContent = nextKey; $('next-time').textContent = fmt12(nextH);
+  let diff = Math.max(0, Math.round((nextH - nowH) * 3600)); const dh = Math.floor(diff / 3600); diff -= dh * 3600; const dm = Math.floor(diff / 60), ds = diff - dm * 60;
+  $('countdown').textContent = [dh, dm, ds].map(x => String(x).padStart(2, '0')).join(':');
+  const today = now.toDateString(); if (alertedToday.day !== today) alertedToday = { day: today };
+  for (const p of SALAH) { const sec = Math.round(prayerHours[p.key] * 3600), nowSec = Math.round(nowH * 3600); if (!alertedToday[p.key] && nowSec >= sec && nowSec - sec <= 2) { alertedToday[p.key] = true; firePrayerAlert(p); } }
+}
+
+/* ---------------- alert + chime ---------------- */
+let alertTimer = null, audioCtx = null;
+function firePrayerAlert(p) { $('alert-name').textContent = p.key; $('alert-ar').textContent = p.ar; $('alert').classList.add('show'); clearTimeout(alertTimer); alertTimer = setTimeout(dismissAlert, 60000); }
+function dismissAlert() { $('alert').classList.remove('show'); }
+function alertOpen() { return $('alert').classList.contains('show'); }
+function chime() { /* Audio and Adhan are intentionally disabled. */ }
+function safeTajweedHtml(html) { return String(html || '').replace(/<span\s+class=(['"])(tj-(?:ghunnah|qalqalah|madd|idgham|ikhfa|iqlab))\1>/g, '<span class="$2">').replace(/<(?!\/?span\b)[^>]*>/g, ''); }
+const TJ = (function () {
+  const LET = /[\u0621-\u064A\u0671\u0670]/;
+  const MARK = /[\u064B-\u0655\u0670\u06D6-\u06ED]/;
+  const SHADDA = '\u0651', SUKOON = '\u0652';
+  const TANWEEN = '\u064B\u064C\u064D';
+  const QALQ = '\u0642\u0637\u0628\u062C\u062F';
+  const IDGHAM = '\u064A\u0631\u0645\u0644\u0648\u0646';
+  const IKHFA = '\u062A\u062B\u062C\u062F\u0630\u0632\u0633\u0634\u0635\u0636\u0637\u0638\u0641\u0642\u0643';
+  const MADD_MARK = /[\u0653\u0654\u0655\u06E4]/;
+  const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  function clusters(t) {
+    const out = []; let i = 0;
+    while (i < t.length) {
+      const ch = t[i];
+      if (LET.test(ch)) { let j = i + 1, marks = ''; while (j < t.length && MARK.test(t[j])) { marks += t[j]; j++; } out.push({ base: ch, marks: marks, text: t.slice(i, j), sp: false }); i = j; }
+      else { out.push({ base: '', marks: '', text: ch, sp: true }); i++; }
+    }
+    return out;
+  }
+  function nextLetter(cl, k) { for (let i = k + 1; i < cl.length; i++) { if (!cl[i].sp) return cl[i].base; } return ''; }
+  function classify(cl, k) {
+    const c = cl[k]; if (c.sp) return null;
+    const b = c.base, m = c.marks;
+    const shadda = m.indexOf(SHADDA) >= 0, sukoon = m.indexOf(SUKOON) >= 0;
+    const tanween = [...TANWEEN].some(x => m.indexOf(x) >= 0);
+    if ((b === '\u0646' || b === '\u0645') && shadda) return 'tj-ghunnah';
+    if (b === '\u0622' || MADD_MARK.test(m) || m.indexOf('\u0670') >= 0) return 'tj-madd';
+    if ((b === '\u0646' && sukoon) || tanween) {
+      const nx = nextLetter(cl, k);
+      if (nx === '\u0628') return 'tj-iqlab';
+      if (IDGHAM.indexOf(nx) >= 0) return 'tj-idgham';
+      if (IKHFA.indexOf(nx) >= 0) return 'tj-ikhfa';
+      return null;
+    }
+    if (b === '\u0645' && sukoon) { const nx = nextLetter(cl, k); if (nx === '\u0628') return 'tj-ikhfa'; if (nx === '\u0645') return 'tj-ghunnah'; }
+    if (QALQ.indexOf(b) >= 0 && sukoon) return 'tj-qalqalah';
+    return null;
+  }
+  function colour(text) {
+    if (!text) return '';
+    const cl = clusters(text); let out = '';
+    for (let k = 0; k < cl.length; k++) {
+      const c = cl[k];
+      if (c.sp) { out += esc(c.text); continue; }
+      const cls = classify(cl, k);
+      out += cls ? `<span class="${cls}">${esc(c.text)}</span>` : esc(c.text);
+    }
+    return out;
+  }
+  return { colour };
+})();
+function arHtml(it) { if (!it) return ''; if (S.tajweed && it.tajweed_html) return safeTajweedHtml(it.tajweed_html); return (S.tajweed && TJ && TJ.colour) ? TJ.colour(it.arabic || '') : escapeHtml(it.arabic || ''); }
+function escapeHtml(v) { return String(v == null ? '' : v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function normSearch(v) { return String(v || '').toLowerCase().normalize('NFKD').replace(/[\u064B-\u065F\u0670]/g, '').replace(/[أإآ]/g, 'ا').replace(/[ى]/g, 'ي').replace(/[ة]/g, 'ه').replace(/\s+/g, ' ').trim(); }
+function itemSearchText(it) { return normSearch([it.title, it.arabic, it.transliteration, it.translation, it.category, it.sub_category, it.source_reference].concat(itemTags(it)).join(' ')); }
+
+/* ---------------- content loading + playlist ---------------- */
+const FILES = { azkar:'content/azkar.json', dua:'content/dua.json', kalima:'content/kalima.json', categories:'content/categories.json', index:'content/content_index.json' };
+let DATA = null, CATEGORIES = null, CONTENT_INDEX = null, playlist = [], cur = { index:0 };
+function loadJSON(url) { return fetch(url).then(r => { if (!r.ok) throw new Error(url); return r.json(); }).catch(() => new Promise((resolve, reject) => { const x = new XMLHttpRequest(); x.open('GET', url, true); x.onreadystatechange = () => { if (x.readyState === 4) { try { resolve(JSON.parse(x.responseText)); } catch (e) { reject(e); } } }; x.send(); })); }
+function normaliseRoot(root, type) { const arr = Array.isArray(root) ? root : (root.items || []); return arr.map((it, i) => Object.assign({ type, id:`${type}_${i}` }, it, { type:it.type || type })); }
+function itemTags(it) { return Array.isArray(it.usage_tags) ? it.usage_tags : []; }
+function modeMatch(it, mode) {
+  if (mode === 'mixed') return true;
+  if (mode === 'favorites') return favorites && favorites.has(it.id);
+  if (mode === 'random') return true;
+  if (TABS.indexOf(mode) >= 0) return itemTab(it) === mode;
+  if (mode === 'witr_istikhara') return itemTags(it).some(t => t === 'witr' || t === 'istikhara' || t === 'qunoot');
+  return itemTags(it).indexOf(mode) >= 0 || it.category === mode || it.sub_category === mode;
+}
+function interleaveByType(items) {
+  const a = items.filter(x => x.type === 'azkar'), d = items.filter(x => x.type === 'dua'), k = items.filter(x => x.type === 'kalima'), out = [];
+  const max = Math.max(a.length, d.length, k.length);
+  for (let i = 0; i < max; i++) { if (a[i]) out.push(a[i]); if (d[i]) out.push(d[i]); if (k[i]) out.push(k[i]); }
+  return out;
+}
+function rebuildPlaylist(preferredId) {
+  if (!DATA) return;
+  let items;
+  const indexedIds = CONTENT_INDEX && CONTENT_INDEX.rotation_modes && CONTENT_INDEX.rotation_modes[S.rotationMode];
+  if (Array.isArray(indexedIds) && indexedIds.length) {
+    const byId = new Map(DATA.all.map(it => [it.id, it]));
+    items = indexedIds.map(id => byId.get(id)).filter(Boolean);
+  } else {
+    items = DATA.all.filter(it => modeMatch(it, S.rotationMode));
+  }
+  if (!items.length) items = DATA.all.slice();
+  playlist = S.rotationMode === 'mixed' ? interleaveByType(items) : items.slice();
+  if (S.rotationMode === 'random') playlist.sort(() => Math.random() - 0.5);
+  let nextIndex = preferredId ? playlist.findIndex(it => it.id === preferredId) : cur.index;
+  if (nextIndex < 0) nextIndex = Math.min(cur.index, playlist.length - 1);
+  cur.index = Math.max(0, nextIndex);
+}
+function currentItem() { return playlist[cur.index] || null; }
+function currentItemId() { const it = currentItem(); return it ? it.id : null; }
+function typeItems(type) { return DATA ? DATA.all.filter(it => it.type === type) : []; }
+
+/* ---------------- rendering ---------------- */
+function renderTabs() {
+  if (!DATA) return;
+  const it = currentItem();
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', it && t.dataset.tab === itemTab(it)));
+}
+function renderChips() {
+  const chips = $('chips'); chips.innerHTML = '';
+  if (!DATA) return;
+  const seen = new Map();
+  const orderedCats = CATEGORIES && Array.isArray(CATEGORIES.categories) ? CATEGORIES.categories.map(c => c.label) : [];
+  orderedCats.forEach(c => { if (playlist.some(it => it.category === c)) seen.set(c, c); });
+  playlist.forEach(it => { if (!seen.has(it.category)) seen.set(it.category, it.category); });
+  seen.forEach((label, category) => {
+    const chip = document.createElement('button'); chip.className = 'chip focusable'; chip.textContent = category;
+    chip.onclick = () => { const ix = playlist.findIndex(it => it.category === category); if (ix >= 0) { cur.index = ix; renderItem(); resetRotate(); setFocus(card()); } };
+    chips.appendChild(chip);
+  });
+}
+function renderItem() {
+  if (!DATA || !playlist.length) return;
+  const it = currentItem();
+  card().dataset.type = itemTab(it);
+  $('card-ic').innerHTML = SVG[itemTab(it)] || '';
+  $('card-title').textContent = TAB_LABEL[itemTab(it)] || it.type;
+  $('card-sub').textContent = [it.category, it.sub_category].filter(Boolean).join(' • ');
+  document.querySelectorAll('#chips .chip').forEach(c => c.classList.toggle('on', c.textContent === it.category));
+  const rep = it.repeat_count ? `<span class="rep">×${escapeHtml(it.repeat_count)}</span>` : '';
+  const showTr = S.showTranslit && S.displayMode !== 'arabic' && S.displayMode !== 'arabic_translation';
+  const showEn = S.displayMode !== 'arabic' && S.displayMode !== 'arabic_transliteration';
+  const transliteration = showTr ? `<div class="tr">${escapeHtml(it.transliteration || '')}</div>` : '';
+  const translation = showEn ? `<div class="en">${escapeHtml(it.translation || '')}</div>` : '';
+  body().scrollTop = 0; body().classList.remove('long-content');
+  body().innerHTML =
+    `<div class="item-name">${escapeHtml(it.title || '')}${rep}</div>` +
+    `<div class="ar">${arHtml(it)}</div>` + transliteration + translation +
+    `<div class="src">${escapeHtml(it.source_reference || '')} · ${escapeHtml(it.authenticity || '')}</div>`;
+  recordRead(it);
+  $('foot-pos').textContent = `${cur.index + 1} / ${playlist.length} · ${MODE_LABEL[S.rotationMode] || S.rotationMode}`;
+  updateFavoriteButton(); renderTabs(); window.requestAnimationFrame(fitArabic);
+}
+function fitArabic() {
+  const b = body(), ar = b.querySelector('.ar'); if (!ar) return;
+  b.classList.remove('long-content'); ar.style.fontSize = '';
+  const tr = b.querySelector('.tr'), en = b.querySelector('.en');
+  if (tr) tr.style.fontSize = ''; if (en) en.style.fontSize = '';
+  const it = currentItem(), length = (ar.textContent || '').replace(/\s+/g, '').length;
+  let size = parseFloat(getComputedStyle(ar).fontSize);
+  const portrait = window.innerWidth <= 900 || window.matchMedia('(orientation:portrait)').matches;
+  const userScale = (typeof S !== 'undefined' && S.ar) ? S.ar : 1;
+  const minSize = (portrait ? 24 : 28) * userScale;
+  if (it && it.is_long_text) size *= .82;
+  else if (length > 260) size *= .84; else if (length > 180) size *= .90; else if (length > 115) size *= .95;
+  ar.style.fontSize = Math.max(minSize, Math.floor(size)) + 'px';
+  let guard = 90;
+  while (b.scrollHeight > b.clientHeight + 2 && parseFloat(ar.style.fontSize) > minSize && guard-- > 0)
+    ar.style.fontSize = Math.max(minSize, parseFloat(ar.style.fontSize) - 1) + 'px';
+  const latin = [tr, en].filter(Boolean);
+  let lguard = 70;
+  while (b.scrollHeight > b.clientHeight + 2 && lguard-- > 0) {
+    let changed = false;
+    const latinFloor = 13 * userScale;
+    latin.forEach(el => { const s = parseFloat(getComputedStyle(el).fontSize); if (s > latinFloor) { el.style.fontSize = (s - 1) + 'px'; changed = true; } });
+    if (!changed) break;
+  }
+  if (b.scrollHeight > b.clientHeight + 2) b.classList.add('long-content');
+}
+function step(delta) { if (!playlist.length) return; cur.index = (cur.index + delta + playlist.length) % playlist.length; renderItem(); resetRotate(); setFocus(card()); }
+const nextItem = () => step(1), prevItem = () => step(-1);
+function tabItems(tab) { return DATA ? DATA.all.filter(it => itemTab(it) === tab) : []; }
+function switchType(tab) {
+  S.rotationMode = tab;
+  saveSettings();
+  const first = tabItems(tab)[0];
+  rebuildPlaylist(first ? first.id : null);
+  renderChips(); renderItem(); resetRotate(); setFocus(card());
+}
+
+/* ---------------- favorites ---------------- */
+let favorites = loadFavorites();
+function loadFavorites() { try { return new Set(JSON.parse(localStorage.getItem(FAVORITES_KEY)) || []); } catch (e) { return new Set(); } }
+function saveFavorites() { try { localStorage.setItem(FAVORITES_KEY, JSON.stringify([...favorites])); } catch (e) {} }
+function isCurrentFavorite() { const it = currentItem(); return !!it && favorites.has(it.id); }
+function updateFavoriteButton() { const btn = $('fav-toggle'); if (!btn) return; const on = isCurrentFavorite(); btn.innerHTML = on ? SVG.starFill : SVG.star; btn.classList.toggle('on', on); btn.setAttribute('aria-label', on ? 'Remove favorite' : 'Add favorite'); btn.title = on ? 'Remove favorite' : 'Add favorite'; }
+function toggleFavorite() {
+  const it = currentItem(); if (!it) return;
+  if (favorites.has(it.id)) favorites.delete(it.id); else favorites.add(it.id);
+  const added = favorites.has(it.id);
+  saveFavorites(); updateFavoriteButton(); showToast(added ? 'Added to favorites' : 'Removed from favorites');
+  const btn = $('fav-toggle'); btn.classList.remove('bump'); void btn.offsetWidth; btn.classList.add('bump');
+}
+function favoriteEntries() { if (!DATA) return []; return DATA.all.filter(it => favorites.has(it.id)); }
+function jumpToId(id) { const ix = playlist.findIndex(it => it.id === id); if (ix >= 0) cur.index = ix; else { S.rotationMode = 'mixed'; rebuildPlaylist(id); } closeOverlay(); renderChips(); renderItem(); resetRotate(); setFocus(card()); }
+
+/* ---------------- rotation ---------------- */
+let rotTimer = null;
+function busy() { return overlayOpen || settingsOpen || alertOpen(); }
+function startRotate() { clearInterval(rotTimer); if (!(S.autoRotate || SCREENSAVER)) return; let sec = S.timerSec; if (SCREENSAVER) sec = Math.min(sec, 30); rotTimer = setInterval(() => { if (!busy()) nextItem(); }, sec * 1000); }
+function resetRotate() { startRotate(); }
+
+
+/* ---------------- local usage stats: recent, history, counters ---------------- */
+function loadStats() { try { return JSON.parse(localStorage.getItem(STATS_KEY)) || { total:0, byId:{}, recent:[], day:'' }; } catch (e) { return { total:0, byId:{}, recent:[], day:'' }; } }
+function saveStats(st) { try { localStorage.setItem(STATS_KEY, JSON.stringify(st)); } catch (e) {} }
+function recordRead(it) {
+  if (!it || !it.id) return;
+  const st = loadStats(), today = new Date().toISOString().slice(0,10);
+  if (st.day !== today) { st.day = today; st.today = 0; }
+  st.total = (st.total || 0) + 1; st.today = (st.today || 0) + 1;
+  st.byId = st.byId || {}; st.byId[it.id] = (st.byId[it.id] || 0) + 1;
+  st.recent = (st.recent || []).filter(id => id !== it.id); st.recent.unshift(it.id); st.recent = st.recent.slice(0,50);
+  saveStats(st);
+}
+function statsItems(kind) {
+  if (!DATA) return [];
+  const byId = new Map(DATA.all.map(it => [it.id, it])); const st = loadStats();
+  if (kind === 'history') return (st.recent || []).map(id => byId.get(id)).filter(Boolean);
+  if (kind === 'stats') return Object.entries(st.byId || {}).sort((a,b) => b[1]-a[1]).map(([id]) => byId.get(id)).filter(Boolean).slice(0,50);
+  return [];
+}
+function statsSummary() { const st = loadStats(); return `Total reads: ${st.total || 0} · Today: ${st.today || 0} · Favorites: ${favorites ? favorites.size : 0}`; }
+
+/* ---------------- overlays ---------------- */
+let overlayOpen = false;
+function addOverlayItem(list, it) {
+  const d = document.createElement('div'); d.className = 'ov-item focusable'; d.tabIndex = 0;
+  d.innerHTML = `<div class="ov-meta">${escapeHtml(TYPE_LABEL[it.type])} • ${escapeHtml(it.category)} • ${escapeHtml(it.sub_category || '')}</div>` +
+    `<div class="ar">${arHtml(it)}</div>` +
+    `<div class="tr">${escapeHtml(it.transliteration || '')}</div>` +
+    `<div class="en">${escapeHtml(it.translation || '')}</div>` +
+    `<div class="src">${escapeHtml(it.source_reference || '')} · ${escapeHtml(it.authenticity || '')}</div>`;
+  d.onclick = () => jumpToId(it.id); list.appendChild(d);
+}
+function renderOverlayItems(items, mode) {
+  const list = $('ov-list'); list.innerHTML = '';
+  if (!items.length) { const empty = document.createElement('div'); empty.className = 'ov-empty'; empty.textContent = mode === 'favorites' ? 'No favorites saved yet. Long-press the card body to add a favorite.' : 'No content available.'; list.appendChild(empty); return; }
+  let lastGroup = '';
+  items.forEach(it => { const group = `${TYPE_LABEL[it.type]} • ${it.category}`; if (group !== lastGroup) { const hd = document.createElement('div'); hd.className = 'ov-cat'; hd.textContent = group; list.appendChild(hd); lastGroup = group; } addOverlayItem(list, it); });
+}
+function searchItems(q) {
+  const n = normSearch(q); if (!n) return DATA ? DATA.all.slice() : [];
+  const parts = n.split(' ').filter(Boolean);
+  return DATA.all.filter(it => { const hay = itemSearchText(it); return parts.every(p => hay.indexOf(p) >= 0); });
+}
+function openOverlay(mode) {
+  const list = $('ov-list'); list.innerHTML = '';
+  const searchBox = $('ov-search'); if (searchBox) { searchBox.value = ''; searchBox.style.display = mode === 'search' ? 'block' : 'none'; }
+  let items = [];
+  if (mode === 'favorites') { $('ov-title').textContent = 'Favorites'; items = favoriteEntries(); $('ov-sub').textContent = `${items.length} saved item${items.length === 1 ? '' : 's'}`; }
+  else if (mode === 'search') { $('ov-title').textContent = 'Search'; items = DATA ? DATA.all.slice() : []; $('ov-sub').textContent = `${items.length} searchable items`; }
+  else if (mode === 'history') { $('ov-title').textContent = 'Recent / History'; items = statsItems('history'); $('ov-sub').textContent = statsSummary(); }
+  else if (mode === 'stats') { $('ov-title').textContent = 'Most Read'; items = statsItems('stats'); $('ov-sub').textContent = statsSummary(); }
+  else { $('ov-title').textContent = MODE_LABEL[S.rotationMode] || 'All Content'; items = playlist.slice(); $('ov-sub').textContent = `${items.length} items in current rotation`; }
+  renderOverlayItems(items, mode);
+  if (searchBox && mode === 'search') { searchBox.oninput = () => { const res = searchItems(searchBox.value); $('ov-sub').textContent = `${res.length} matching item${res.length === 1 ? '' : 's'}`; renderOverlayItems(res, mode); }; }
+  list.scrollTop = 0; $('overlay').classList.add('show'); overlayOpen = true; if (mode === 'search' && searchBox) setFocus(searchBox); else { const first = list.querySelector('.focusable'); if (first) setFocus(first); }
+}
+function closeOverlay() { $('overlay').classList.remove('show'); overlayOpen = false; setFocus(card()); }
+
+/* ---------------- settings panel with Save & Apply ---------------- */
+let settingsOpen = false;
+function getDraft() { if (!draftSettings) draftSettings = clone(S); return draftSettings; }
+function openSettings() { draftSettings = clone(S); settingsOpen = true; $('settings').classList.add('show'); syncSettingsUI(); $('set-status').textContent = 'Changes apply only after Save & Apply.'; setFocus($('set-save')); }
+function closeSettings() { draftSettings = null; settingsOpen = false; $('settings').classList.remove('show'); startRotate(); setFocus(card()); }
+function saveAndApplySettings() { const oldId = currentItemId(); S = Object.assign({}, DEFAULTS, getDraft()); const manual = manualGeo(); if (manual) { GEO = manual; saveGeo(GEO); setNet(true); computeTimes(); } else { detectLocation().then(g => { if (g) { GEO = g; saveGeo(g); setNet(true); computeTimes(); } else setNet(false); }); } applySettings(true); rebuildPlaylist(oldId); renderChips(); renderItem(); $('set-status').textContent = 'Saved and applied.'; setFocus($('set-close')); }
+function syncSettingsUI() {
+  const D = settingsOpen ? getDraft() : S;
+  document.querySelectorAll('#theme-row .opt').forEach(o => o.classList.toggle('on', o.dataset.theme === D.theme));
+  document.querySelectorAll('#mode-row .opt').forEach(o => o.classList.toggle('on', o.dataset.mode === D.rotationMode));
+  document.querySelectorAll('#city-row .opt').forEach(o => o.classList.toggle('on', o.dataset.city === (D.cityMode || 'auto')));
+  document.querySelectorAll('#timer-presets .opt').forEach(o => o.classList.toggle('on', +o.dataset.min * 60 === D.timerSec));
+  document.querySelectorAll('#display-row .opt').forEach(o => o.classList.toggle('on', o.dataset.display === (D.displayMode || 'full')));
+  $('cust-val').textContent = D.timerSec; $('ar-pct').textContent = Math.round(D.ar * 100) + '%'; $('tr-pct').textContent = Math.round(D.tr * 100) + '%'; $('en-pct').textContent = Math.round(D.en * 100) + '%';
+  document.querySelectorAll('.toggle').forEach(t => { const key = t.dataset.tog; t.textContent = `${TOGNAMES[key]}: ${D[key] ? 'On' : 'Off'}`; t.classList.toggle('on', !!D[key]); });
+}
+function markPending() { $('set-status').textContent = 'Unsaved changes. Press Save & Apply to update the display.'; syncSettingsUI(); }
+function initSettings() {
+  $('gear').onclick = openSettings; if ($('search-btn')) $('search-btn').onclick = () => openOverlay('search'); if ($('history-btn')) $('history-btn').onclick = () => openOverlay('history'); if ($('stats-btn')) $('stats-btn').onclick = () => openOverlay('stats'); $('set-close').onclick = closeSettings; $('set-save').onclick = saveAndApplySettings;
+  document.querySelectorAll('#mode-row .opt').forEach(o => o.onclick = () => { getDraft().rotationMode = o.dataset.mode; markPending(); });
+  document.querySelectorAll('#city-row .opt').forEach(o => o.onclick = () => { getDraft().cityMode = o.dataset.city; markPending(); });
+  document.querySelectorAll('#timer-presets .opt').forEach(o => o.onclick = () => { getDraft().timerSec = +o.dataset.min * 60; markPending(); });
+  $('cust-dn').onclick = () => { getDraft().timerSec = clamp(getDraft().timerSec - 15, 10, 3600); markPending(); };
+  $('cust-up').onclick = () => { getDraft().timerSec = clamp(getDraft().timerSec + 15, 10, 3600); markPending(); };
+  $('cust-apply').onclick = markPending;
+  document.querySelectorAll('#theme-row .opt').forEach(o => o.onclick = () => { getDraft().theme = o.dataset.theme; markPending(); });
+  document.querySelectorAll('#display-row .opt').forEach(o => o.onclick = () => { getDraft().displayMode = o.dataset.display; markPending(); });
+  document.querySelectorAll('[data-font]').forEach(b => b.onclick = () => { const f = b.dataset.font; getDraft()[f] = clamp(+(getDraft()[f] + (+b.dataset.d) * .1).toFixed(2), .6, 2.0); markPending(); });
+  document.querySelectorAll('.toggle').forEach(t => t.onclick = () => { const D = getDraft(); D[t.dataset.tog] = !D[t.dataset.tog]; markPending(); });
+}
+
+/* ---------------- gestures: horizontal swipe item navigation + long-press favorite ---------------- */
+let gesture = null, longPressTimer = null, longPressDone = false;
+function eventPoint(ev) { const p = ev.touches && ev.touches.length ? ev.touches[0] : (ev.changedTouches && ev.changedTouches.length ? ev.changedTouches[0] : ev); return { x:p.clientX, y:p.clientY, id:p.identifier != null ? p.identifier : ev.pointerId }; }
+const SWIPE = { dead: 10, dist: 44, fling: 26, flingVel: 0.32 };
+function startGesture(ev) {
+  if (ev.target.closest('button')) return;
+  if (overlayOpen || settingsOpen) return;
+  const p = eventPoint(ev); setFocus(card()); longPressDone = false;
+  gesture = { id:p.id, x:p.x, y:p.y, lastX:p.x, lastY:p.y, t:Date.now(), axis:null, moved:false };
+  if (ev.pointerId != null && card().setPointerCapture) { try { card().setPointerCapture(ev.pointerId); } catch (e) {} }
+  clearTimeout(longPressTimer);
+  longPressTimer = setTimeout(() => {
+    if (!gesture || gesture.moved) return;
+    longPressDone = true; toggleFavorite();
+    if (navigator.vibrate) navigator.vibrate(35);
+  }, 600);
+}
+function moveGesture(ev) {
+  if (!gesture) return;
+  const p = eventPoint(ev), dx = p.x - gesture.x, dy = p.y - gesture.y;
+  const adx = Math.abs(dx), ady = Math.abs(dy);
+  gesture.lastX = p.x; gesture.lastY = p.y;
+  if (!gesture.axis && (adx > SWIPE.dead || ady > SWIPE.dead)) gesture.axis = adx >= ady ? 'x' : 'y';
+  if (adx > SWIPE.dead || ady > SWIPE.dead) { gesture.moved = true; clearTimeout(longPressTimer); }
+  if (gesture.axis === 'x' && ev.cancelable) ev.preventDefault();
+}
+function endGesture(ev) {
+  clearTimeout(longPressTimer);
+  if (!gesture) return;
+  if (longPressDone) { gesture = null; return; }
+  const p = eventPoint(ev);
+  const dx = (typeof p.x === 'number' ? p.x : gesture.lastX) - gesture.x;
+  const dy = (typeof p.y === 'number' ? p.y : gesture.lastY) - gesture.y;
+  const adx = Math.abs(dx), ady = Math.abs(dy);
+  const dt = Math.max(1, Date.now() - gesture.t), vel = adx / dt;
+  const b = body(), scrollable = b && b.scrollHeight > b.clientHeight + 4;
+  const horizontal = adx >= SWIPE.dist && adx >= ady;
+  const fling = adx >= SWIPE.fling && vel > SWIPE.flingVel && adx >= ady;
+  const vertical = ady >= SWIPE.dist && ady > adx * 1.2 && !scrollable;
+  if (horizontal || fling) { (dx < 0 ? nextItem : prevItem)(); if (ev.cancelable) ev.preventDefault(); }
+  else if (vertical) { (dy < 0 ? nextItem : prevItem)(); if (ev.cancelable) ev.preventDefault(); }
+  gesture = null;
+}
+function initCardGestures() {
+  const el = card(); el.onclick = () => setFocus(el);
+  if (window.PointerEvent) {
+    el.addEventListener('pointerdown', startGesture, { passive:true });
+    el.addEventListener('pointermove', moveGesture, { passive:false });
+    el.addEventListener('pointerup', endGesture, { passive:false });
+    el.addEventListener('pointercancel', () => { clearTimeout(longPressTimer); gesture = null; });
+  } else {
+    el.addEventListener('touchstart', startGesture, { passive:true });
+    el.addEventListener('touchmove', moveGesture, { passive:false });
+    el.addEventListener('touchend', endGesture, { passive:false });
+    el.addEventListener('touchcancel', () => { clearTimeout(longPressTimer); gesture = null; });
+  }
+}
+function showToast(msg) { const t = $('toast'); if (!t) return; t.textContent = msg; t.classList.add('show'); clearTimeout(showToast._t); showToast._t = setTimeout(() => t.classList.remove('show'), 1200); }
+/* ---------------- spatial remote navigation ---------------- */
+let curFocus = null;
+function visibleFocusables() { const scope = settingsOpen ? $('settings') : (overlayOpen ? $('overlay') : $('shift')); return [...scope.querySelectorAll('.focusable')].filter(el => { if (el.offsetParent === null && !el.classList.contains('card')) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; }); }
+function setFocus(el) { if (!el) return; document.querySelectorAll('.focusable.focused').forEach(e => e.classList.remove('focused')); el.classList.add('focused'); curFocus = el; if (el.scrollIntoView && el !== card()) el.scrollIntoView({ block:'nearest' }); }
+function ctr(el) { const r = el.getBoundingClientRect(); return { x:r.left + r.width / 2, y:r.top + r.height / 2 }; }
+function move(dir) { const list = visibleFocusables(); if (!list.length) return; if (!curFocus || list.indexOf(curFocus) < 0) { setFocus(list[0]); return; } const c = ctr(curFocus); let best = null, score = Infinity; for (const el of list) { if (el === curFocus) continue; const t = ctr(el), dx = t.x - c.x, dy = t.y - c.y; let ok, pri, sec; if (dir === 'right') { ok = dx > 6; pri = dx; sec = Math.abs(dy); } else if (dir === 'left') { ok = dx < -6; pri = -dx; sec = Math.abs(dy); } else if (dir === 'down') { ok = dy > 6; pri = dy; sec = Math.abs(dx); } else { ok = dy < -6; pri = -dy; sec = Math.abs(dx); } if (!ok) continue; const sc = pri + sec * 2; if (sc < score) { score = sc; best = el; } } if (best) setFocus(best); }
+function scrollCardIfNeeded(dir) { if (curFocus !== card()) return false; const b = body(); if (!b || b.scrollHeight <= b.clientHeight + 4) return false; const max = b.scrollHeight - b.clientHeight; if (dir === 'down' && b.scrollTop < max - 2) { b.scrollTop += b.clientHeight * .35; return true; } if (dir === 'up' && b.scrollTop > 2) { b.scrollTop -= b.clientHeight * .35; return true; } return false; }
+function onBack() { if (alertOpen()) { dismissAlert(); return true; } if (settingsOpen) { closeSettings(); return true; } if (overlayOpen) { closeOverlay(); return true; } return false; }
+window.onTvBack = onBack;
+document.addEventListener('keydown', e => {
+  if (alertOpen()) { dismissAlert(); e.preventDefault(); return; }
+  const k = e.key;
+  if (overlayOpen && !settingsOpen) {
+    if (k === 'ArrowDown') { move('down'); e.preventDefault(); } else if (k === 'ArrowUp') { move('up'); e.preventDefault(); } else if (k === 'ArrowRight') { move('right'); e.preventDefault(); } else if (k === 'ArrowLeft') { move('left'); e.preventDefault(); } else if (k === 'Enter') { if (curFocus && curFocus.classList.contains('ov-item')) curFocus.click(); e.preventDefault(); } else if (k === 'Escape' || k === 'Backspace') { closeOverlay(); e.preventDefault(); }
+    return;
+  }
+  if (!settingsOpen && curFocus === card() && (k === 'ArrowRight' || k === 'ArrowLeft')) { k === 'ArrowRight' ? nextItem() : prevItem(); e.preventDefault(); return; }
+  if (!settingsOpen && (k === 'ArrowDown' || k === 'ArrowUp') && scrollCardIfNeeded(k === 'ArrowDown' ? 'down' : 'up')) { e.preventDefault(); return; }
+  switch (k) { case 'ArrowRight': move('right'); e.preventDefault(); break; case 'ArrowLeft': move('left'); e.preventDefault(); break; case 'ArrowDown': move('down'); e.preventDefault(); break; case 'ArrowUp': move('up'); e.preventDefault(); break; case 'Enter': if (curFocus) curFocus.click(); e.preventDefault(); break; case 'Escape': case 'Backspace': onBack(); e.preventDefault(); break; }
+});
+
+/* ---------------- immersive TV idle mode ---------------- */
+let immersiveTimer = null;
+function wakeImmersive() {
+  document.body.classList.remove('immersive-idle');
+  clearTimeout(immersiveTimer);
+  if (!S.immersive || settingsOpen || overlayOpen || alertOpen()) return;
+  immersiveTimer = setTimeout(() => { if (S.immersive && !settingsOpen && !overlayOpen && !alertOpen()) document.body.classList.add('immersive-idle'); }, SCREENSAVER ? 3500 : 6500);
+}
+['mousemove','mousedown','touchstart','pointerdown','keydown'].forEach(ev => document.addEventListener(ev, wakeImmersive, { passive:true }));
+
+/* ---------------- burn-in protection ---------------- */
+const SHIFTS = [[0,0],[8,4],[-6,8],[6,-6],[-8,-4],[4,6]]; let shiftIdx = 0;
+function burnInShift() { if (!SCREENSAVER) return; shiftIdx = (shiftIdx + 1) % SHIFTS.length; const [x, y] = SHIFTS[shiftIdx]; $('shift').style.transform = `translate(${x}px, ${y}px)`; }
+
+/* ---------------- boot ---------------- */
+function start() {
+  applySettings(false); wakeImmersive(); setNet(navigator.onLine); computeTimes(); tickClock(); setInterval(tickClock, 1000); setInterval(computeTimes, 30 * 60 * 1000);
+  document.querySelectorAll('.tab').forEach(t => t.onclick = () => switchType(t.dataset.tab));
+  if ($('nav-prev')) $('nav-prev').onclick = prevItem;
+  if ($('nav-next')) $('nav-next').onclick = nextItem;
+  if ($('viewall')) $('viewall').onclick = () => openOverlay('all'); if ($('fav-view')) $('fav-view').onclick = () => openOverlay('favorites'); $('fav-toggle').onclick = toggleFavorite;
+  initSettings(); initCardGestures();
+  Promise.all([loadJSON(FILES.azkar), loadJSON(FILES.dua), loadJSON(FILES.kalima), loadJSON(FILES.categories).catch(() => null), loadJSON(FILES.index).catch(() => null)]).then(([azkar, dua, kalima, cats, index]) => {
+    DATA = { azkar:normaliseRoot(azkar, 'azkar'), dua:normaliseRoot(dua, 'dua'), kalima:normaliseRoot(kalima, 'kalima') };
+    DATA.all = DATA.azkar.concat(DATA.dua, DATA.kalima); CATEGORIES = cats; CONTENT_INDEX = index;
+    rebuildPlaylist(); renderTabs(); renderChips(); renderItem(); setFocus(card()); startRotate();
+  }).catch(err => { body().innerHTML = '<div style="color:#b00">Content failed to load: ' + escapeHtml(err.message || err) + '</div>'; });
+  setInterval(burnInShift, SCREENSAVER ? 20000 : 30000); window.addEventListener('resize', fitArabic);
+  detectLocation().then(g => { if (g) { GEO = g; saveGeo(g); setNet(true); computeTimes(); } else setNet(false); }).catch(() => setNet(false));
+  window.addEventListener('online', () => { setNet(true); detectLocation().then(g => { if (g) { GEO = g; saveGeo(g); computeTimes(); } }); });
+  window.addEventListener('offline', () => setNet(false));
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();

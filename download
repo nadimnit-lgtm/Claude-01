@@ -1,0 +1,157 @@
+{
+  "schema_version": "Rev07.05",
+  "types": {
+    "dua": "Dua",
+    "azkar": "Azkar",
+    "kalima": "Kalima"
+  },
+  "categories": [
+    {
+      "label": "After Salah Azkar",
+      "type": "mixed"
+    },
+    {
+      "label": "Anxiety & Distress Duas",
+      "type": "mixed"
+    },
+    {
+      "label": "Before Sleep Azkar",
+      "type": "mixed"
+    },
+    {
+      "label": "Children Duas",
+      "type": "mixed"
+    },
+    {
+      "label": "Daily Duas",
+      "type": "mixed"
+    },
+    {
+      "label": "Darood and Salawat",
+      "type": "mixed"
+    },
+    {
+      "label": "Evening Azkar",
+      "type": "mixed"
+    },
+    {
+      "label": "Family Duas",
+      "type": "mixed"
+    },
+    {
+      "label": "Forgiveness Duas",
+      "type": "mixed"
+    },
+    {
+      "label": "General Azkar",
+      "type": "mixed"
+    },
+    {
+      "label": "Gratitude Duas",
+      "type": "mixed"
+    },
+    {
+      "label": "Guidance Duas",
+      "type": "mixed"
+    },
+    {
+      "label": "Health Duas",
+      "type": "mixed"
+    },
+    {
+      "label": "Istighfar",
+      "type": "mixed"
+    },
+    {
+      "label": "Istikhara Duas",
+      "type": "mixed"
+    },
+    {
+      "label": "Knowledge Duas",
+      "type": "mixed"
+    },
+    {
+      "label": "Morning Azkar",
+      "type": "mixed"
+    },
+    {
+      "label": "Parents Duas",
+      "type": "mixed"
+    },
+    {
+      "label": "Prophetic Duas",
+      "type": "mixed"
+    },
+    {
+      "label": "Prophetic and Daily Duas",
+      "type": "mixed"
+    },
+    {
+      "label": "Protection Azkar",
+      "type": "mixed"
+    },
+    {
+      "label": "Protection and Ruqyah",
+      "type": "mixed"
+    },
+    {
+      "label": "Quranic Duas",
+      "type": "mixed"
+    },
+    {
+      "label": "Ramadan Azkar",
+      "type": "mixed"
+    },
+    {
+      "label": "Rizq Duas",
+      "type": "mixed"
+    },
+    {
+      "label": "Ruqyah and Protection",
+      "type": "mixed"
+    },
+    {
+      "label": "Salawat",
+      "type": "mixed"
+    },
+    {
+      "label": "Six Kalimas",
+      "type": "mixed"
+    },
+    {
+      "label": "Sleep Azkar",
+      "type": "mixed"
+    },
+    {
+      "label": "Travel Duas",
+      "type": "mixed"
+    },
+    {
+      "label": "Wake Up Azkar",
+      "type": "mixed"
+    },
+    {
+      "label": "Witr and Qunoot Duas",
+      "type": "mixed"
+    }
+  ],
+  "rotation_modes": {
+    "kalima": {
+      "label": "Six Kalimas",
+      "description": "Rotate through the six Kalimas only.",
+      "type": "kalima",
+      "tags": [
+        "kalima",
+        "six_kalima"
+      ]
+    }
+  },
+  "city_presets": [
+    "auto",
+    "riyadh",
+    "jeddah",
+    "makkah",
+    "madinah",
+    "dammam"
+  ]
+}
