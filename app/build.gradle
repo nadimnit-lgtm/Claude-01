@@ -1,0 +1,54 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+// Release signing is read from environment variables set as GitHub secrets.
+// Debug builds work without a keystore.
+def releaseKeystore = file(System.getenv("KEYSTORE_FILE") ?: "azkar-release.jks")
+
+android {
+    namespace 'com.ahmed.azkartv'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.ahmed.azkartv"
+        minSdk 22
+        targetSdk 34
+        versionCode 9
+        versionName "2.6-Rev12.00"
+    }
+
+    signingConfigs {
+        release {
+            if (releaseKeystore.exists()) {
+                storeFile releaseKeystore
+                storePassword System.getenv("KEYSTORE_PASSWORD")
+                keyAlias System.getenv("KEY_ALIAS")
+                keyPassword System.getenv("KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (releaseKeystore.exists()) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.13.1'
+}
